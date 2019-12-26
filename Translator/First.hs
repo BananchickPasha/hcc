@@ -7,7 +7,6 @@ import qualified Data.Map as M
 
 data TranslatorST = TranslatorST { variables :: M.Map String (Maybe Int)
                                  , stackIndex :: Int
-                                 , resCode :: String
                                  }
 
 addVar :: String -> Maybe Int -> State TranslatorST ()
@@ -17,14 +16,10 @@ addVar varName mVal = State $ \xs -> let newVars = M.insert varName mVal (variab
 
 getVar :: String -> State TranslatorST (Maybe Int)
 getVar varName = State $ \xs -> (xs, fromMaybe Nothing (variables xs M.!? varName))
-getCode :: State TranslatorST String
-getCode = State $ \xs -> (xs, resCode xs)
-changeCode :: String -> State TranslatorST String
-changeCode code = State $ \xs -> (xs {resCode = (resCode xs ++ code)}, code)
 
 
 trAST :: [Statement] -> String
-trAST stms = let initState = TranslatorST {variables = M.empty, stackIndex = 0, resCode = ""} 
+trAST stms = let initState = TranslatorST {variables = M.empty, stackIndex = 0} 
                  func = runState (trStatements stms) initState
                  (_, code) = func
               in code
