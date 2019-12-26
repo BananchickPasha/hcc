@@ -3,15 +3,15 @@ module AST
   , Expr(..)
   , UnExpr(..)
   , BinExpr(..)
-  , Var
   )
 where
 
-data Statement =
-               Return Expr
-               | Assign Var Expr
+data Statement = Return (Maybe Expr)
+               | Assign String (Maybe Expr)
                | Function String [Statement] --right now only () functiosn
+               | If Expr [Statement] (Maybe Statement)
                deriving (Show)
+
 data Expr = ConstExpr Int
           | UnExpr UnExpr Expr
           | BinExpr BinExpr Expr Expr
@@ -32,9 +32,9 @@ data BinExpr = BinAddExpr
              | BinLogEqExpr
              | BinLogNotEqExpr
              | BinLogLTExpr
-             | BinLogLTThanExpr
+             | BinLogLTEqExpr
              | BinLogGTExpr
-             | BinLogGTThanExpr
+             | BinLogGTEqExpr
 
              | BinModulExpr
 
@@ -45,4 +45,3 @@ data BinExpr = BinAddExpr
              | BinBitLeftExpr
              | BinBitRightExpr
              deriving (Show)
-type Var = String

@@ -1,5 +1,5 @@
 module Parser.Lexemes 
-  (whitespace, inScope, inScopes)
+  (whitespace, inScope, inScopes, reserved, reservedChar)
   where
 
 import Text.ParserCombinators.Parsec
@@ -9,7 +9,7 @@ import Control.Monad (void)
 
 
 whitespace :: Parser ()
-whitespace = void $ many $ oneOf " \n\t"
+whitespace = void . many $ oneOf " \n\t"
 
 inScopes :: Char -> Char -> Parser a -> Parser a
 inScopes begin end parser = do
@@ -24,3 +24,7 @@ inScope '(' = inScopes '(' ')'
 inScope a = inScopes a a
 
 
+reserved :: String -> Parser ()
+reserved str = try $ whitespace <* string str <* whitespace
+reservedChar :: Char -> Parser ()
+reservedChar ch = try $ whitespace <* char ch <* whitespace

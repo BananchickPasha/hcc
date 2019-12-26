@@ -4,20 +4,25 @@ import Text.ParserCombinators.Parsec.Language
 import Text.ParserCombinators.Parsec.Expr
 import Control.Monad
 import qualified Text.ParserCombinators.Parsec.Token as Token
+import qualified Data.Map as M
 
 import Parser.Lexemes
 import Parser.CLike
 import Translator.First
+import Translator.LabelUniq
 
 main = do
-  let code = case generateCode of
+  str <- readFile "test/test.c"
+  let ast = parse parseMany "" str
+  print ast
+  let code = case generateCode str of
                Left _ -> ""
-               Right res -> res
+               Right res -> makeitwork res
   writeFile "test/res.s" code
 
-generateCode :: Either ParseError String
-generateCode = do
-  ast <- parse parseMany "" "int main () { return (6-2)/2;}"
+generateCode :: String -> Either ParseError String
+generateCode str = do
+  ast <- parse parseMany "" str
   return $ trStatement $ head ast
 
 
