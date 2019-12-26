@@ -23,7 +23,7 @@ main = do
 generateCode :: String -> Either ParseError String
 generateCode str = do
   ast <- parse parseMany "" str
-  return $ trStatement $ head ast
+  return $ trAST ast
 
 
 
