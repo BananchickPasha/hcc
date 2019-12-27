@@ -8,12 +8,11 @@ import           Text.ParserCombinators.Parsec
 import           Text.ParserCombinators.Parsec.Language
 import           Text.ParserCombinators.Parsec.Expr
 import           Control.Monad
-import Data.Char
 import qualified Text.ParserCombinators.Parsec.Token
                                                as Token
 
 
-statements = choice $ map try [funcStm, returnStm, assignStm, ifStm]
+statements = choice $ map try [funcStm, returnStm, declStm, assignStm, ifStm]
 parseMany :: Parser [Statement]
 parseMany = many1 statements
 
@@ -32,11 +31,18 @@ returnStm = do
   reservedChar ';'
   return . Return $ Just expr
 
-assignStm :: Parser Statement
-assignStm = do
+declStm :: Parser Statement
+declStm = do
   reserved "int"
   varName <- var
   expr <- Just <$> (reservedChar '=' >> parseAnyExpr) <|> return Nothing
+  reservedChar ';'
+  return $ Decl varName expr
+
+assignStm :: Parser Statement
+assignStm = do
+  varName <- var
+  expr <- reservedChar '=' >> parseAnyExpr
   reservedChar ';'
   return $ Assign varName expr
 
@@ -49,11 +55,3 @@ ifStm = do
   return $ If expr stms elifs
 
 
-var :: Parser String
-var = do
-    fc <- firstChar
-    rest <- many nonFirstChar
-    return (fc:rest)
-  where
-    firstChar = satisfy (\a -> isLetter a || a == '_')
-    nonFirstChar = satisfy (\a -> isDigit a || isLetter a || a == '_')

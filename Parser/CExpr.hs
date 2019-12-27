@@ -11,13 +11,17 @@ parseManyExpr :: Parser [Expr]
 parseManyExpr = many1 parseAnyExpr
 
 parseAnyExpr :: Parser Expr
-parseAnyExpr = opers $ inScope '(' parseAnyExpr <|> constIntExpr <|> opers constIntExpr
+parseAnyExpr = opers $ inScope '(' parseAnyExpr <|> constVar <|> opers constVar
   where opers = buildExpressionParser operators
 
+constVar = constIntExpr <|> varExpr
 constIntExpr :: Parser Expr
 constIntExpr = do
   n <- many1 digit <* whitespace
   return . ConstExpr $ read n
+
+varExpr :: Parser Expr
+varExpr = VarExpr <$> var
 
 operators :: OperatorTable Char () Expr
 operators =

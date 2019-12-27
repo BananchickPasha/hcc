@@ -3,7 +3,7 @@ let
   inherit (nixpkgs) pkgs;
   ghc = pkgs.haskellPackages.ghcWithHoogle
                    (haskellPackages: with haskellPackages; [
-                     megaparsec
+                     exceptions
                    ]);
 in
 pkgs.stdenv.mkDerivation {

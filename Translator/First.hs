@@ -3,23 +3,27 @@ import AST
 import Control.Applicative
 import Data.Maybe (fromMaybe)
 import Data.Sequence.Internal
+import Data.Functor
 import qualified Data.Map as M
 
-data TranslatorST = TranslatorST { variables :: M.Map String (Maybe Int)
+data TranslatorST = TranslatorST { variables :: M.Map String Int
                                  , stackIndex :: Int
+                                 , errors :: [String]
+                                 , warnings :: [String]
                                  }
 
-addVar :: String -> Maybe Int -> State TranslatorST ()
-addVar varName mVal = State $ \xs -> let newVars = M.insert varName mVal (variables xs)
-                                         newStack = stackIndex xs - 1
-                                      in (xs {variables = newVars, stackIndex = newStack}, ())
+addVar :: String -> State TranslatorST ()
+addVar varName = State $ \xs -> let newVars = M.insert varName (stackIndex xs - 8) (variables xs)
+                                    newStack = stackIndex xs - 8
+                                 in (xs {variables = newVars, stackIndex = newStack}, ())
 
 getVar :: String -> State TranslatorST (Maybe Int)
-getVar varName = State $ \xs -> (xs, fromMaybe Nothing (variables xs M.!? varName))
-
+getVar varName = State $ \xs -> (xs, variables xs M.!? varName)
+throwError :: String -> State TranslatorST () 
+throwError err = State $ \xs -> (xs {errors = err : errors xs}, ())
 
 trAST :: [Statement] -> String
-trAST stms = let initState = TranslatorST {variables = M.empty, stackIndex = 0} 
+trAST stms = let initState = TranslatorST {variables = M.empty, stackIndex = 0, errors = [], warnings = []} 
                  func = runState (trStatements stms) initState
                  (_, code) = func
               in code
@@ -28,10 +32,12 @@ trStatements stms = concat <$> mapM trStatement stms
 trStatement :: Statement -> State TranslatorST String
 trStatement (Function name body) = do
   blocks <- mapM trStatement body
-  return $ unlines $ (".globl " ++ name) : (name++":") : blocks
+  return $ unlines $ (".globl " ++ name) : (name++":") : "mov %rsp, %rbp" : blocks
 
-trStatement (Return (Just expr)) =
-  trExpr expr >>= \expr' -> return $ unlines [expr', "ret"]
+trStatement (Return mExpr) = case mExpr of
+                               Just expr -> trExpr expr >>= \expr' -> return $ unlines [expr', preRetCode, "ret"]
+                               Nothing -> return $ unlines ["mov $0, %rax", preRetCode ,"ret"]
+                             where preRetCode = "mov %rbp, %rsp"
 trStatement (If expr stms els) = do
   blocks <- mapM trStatement stms
   elseCode <- case els of 
@@ -39,8 +45,31 @@ trStatement (If expr stms els) = do
                 Just e -> trStatement e
   expr' <- trExpr expr
   return . unlines $ [expr' , "cmp $0, %rax", "je _notThis"] ++ blocks ++ ["_notThis:", elseCode] 
+trStatement (Decl varName mval) = do
+  val' <- getVar varName
+  let val = fromMaybe (ConstExpr 0) mval
+  case val' of 
+    Just _ -> throwError "This var already exists" $> ""
+    Nothing -> do 
+      addVar varName
+      valCode <- trExpr val
+      return . unlines $ valCode : ["push %rax"]
+trStatement (Assign varName val) = do
+  val' <- getVar varName
+  case val' of 
+    Nothing -> throwError "This var does not exist" $> ""
+    Just offset -> do 
+      valCode <- trExpr val
+      return . unlines $ valCode : ["mov %rax, " ++ show offset ++ "(%rbp)"]
+
 trExpr :: Expr -> State TranslatorST String
 trExpr (ConstExpr x) = return $ "mov $" ++ show x ++ ", %rax"
+trExpr (VarExpr varName) = do
+  mOffset <- getVar varName
+  case mOffset of
+    Nothing -> throwError "This var does not exist" $> ""
+    Just offset -> return $ "mov " ++ show offset ++ "(%rbp)" ++ ", %rax"
+
 trExpr (UnExpr expr x) = trExpr x >>= \x' -> return $ trExpr' expr x'
   where
   trExpr' NegExpr x = unlines [x, "neg %rax"]
