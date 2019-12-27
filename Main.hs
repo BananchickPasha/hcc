@@ -18,6 +18,9 @@ main = do
   let code = case generateCode str of
                Left _ -> ""
                Right res -> makeitwork res
+  putStrLn ""
+  putStrLn "---------CODE---------"
+  putStrLn code
   writeFile "test/res.s" code
 
 generateCode :: String -> Either ParseError String

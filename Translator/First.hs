@@ -13,8 +13,10 @@ import Translator.State
 trAST :: [Statement] -> String
 trAST stms = let initState = TranslatorST {variables = [M.empty], stackIndex = 0, errors = [], warnings = []} 
                  func = runState (trStatements stms) initState
-                 (_, code) = func
-              in code
+                 (state, code) = func
+              in case errors state of
+                   [] -> code
+                   xs -> concat $ Prelude.reverse xs
 
 trStatements :: [Statement] -> State TranslatorST String
 trStatements stms = concat <$> mapM trStatement stms
@@ -50,6 +52,11 @@ trStatement (Assign varName val) = do
     Just offset -> do 
       valCode <- trExpr val
       return . unlines $ valCode : ["mov %rax, " ++ show offset ++ "(%rbp)"]
+trStatement (Block stms) = do
+  diveIn
+  code <- trStatements stms
+  diveOut
+  return code
 
 trExpr :: Expr -> State TranslatorST String
 trExpr (ConstExpr x) = return $ "mov $" ++ show x ++ ", %rax"
