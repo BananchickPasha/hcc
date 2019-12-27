@@ -5,28 +5,17 @@ import Data.Maybe (fromMaybe)
 import Data.Sequence.Internal
 import Data.Functor
 import qualified Data.Map as M
+import Distribution.Compat.Parsing (choice)
+import Translator.State
 
-data TranslatorST = TranslatorST { variables :: M.Map String Int
-                                 , stackIndex :: Int
-                                 , errors :: [String]
-                                 , warnings :: [String]
-                                 }
 
-addVar :: String -> State TranslatorST ()
-addVar varName = State $ \xs -> let newVars = M.insert varName (stackIndex xs - 8) (variables xs)
-                                    newStack = stackIndex xs - 8
-                                 in (xs {variables = newVars, stackIndex = newStack}, ())
-
-getVar :: String -> State TranslatorST (Maybe Int)
-getVar varName = State $ \xs -> (xs, variables xs M.!? varName)
-throwError :: String -> State TranslatorST () 
-throwError err = State $ \xs -> (xs {errors = err : errors xs}, ())
 
 trAST :: [Statement] -> String
-trAST stms = let initState = TranslatorST {variables = M.empty, stackIndex = 0, errors = [], warnings = []} 
+trAST stms = let initState = TranslatorST {variables = [M.empty], stackIndex = 0, errors = [], warnings = []} 
                  func = runState (trStatements stms) initState
                  (_, code) = func
               in code
+
 trStatements :: [Statement] -> State TranslatorST String
 trStatements stms = concat <$> mapM trStatement stms
 trStatement :: Statement -> State TranslatorST String

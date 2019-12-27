@@ -12,7 +12,7 @@ import qualified Text.ParserCombinators.Parsec.Token
                                                as Token
 
 
-statements = choice $ map try [funcStm, returnStm, declStm, assignStm, ifStm]
+statements = choice $ map try [funcStm, returnStm, declStm, assignStm, ifStm, blockStm]
 parseMany :: Parser [Statement]
 parseMany = many1 statements
 
@@ -45,6 +45,9 @@ assignStm = do
   expr <- reservedChar '=' >> parseAnyExpr
   reservedChar ';'
   return $ Assign varName expr
+
+blockStm :: Parser Statement
+blockStm = Block <$> inScope '{' parseMany
 
 ifStm :: Parser Statement
 ifStm = do

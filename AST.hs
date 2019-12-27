@@ -8,6 +8,7 @@ where
 
 data Statement = Return (Maybe Expr)
                | Assign String Expr
+               | Block [Statement]
                | Decl   String (Maybe Expr)
                | Function String [Statement] --right now only () functiosn
                | If Expr [Statement] (Maybe Statement)
