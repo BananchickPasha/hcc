@@ -9,7 +9,6 @@ import qualified Data.Map as M
 import Parser.Lexemes
 import Parser.CLike
 import Translator.First
-import Translator.LabelUniq
 
 main = do
   str <- readFile "test/test.c"
@@ -17,7 +16,7 @@ main = do
   print ast
   let code = case generateCode str of
                Left _ -> ""
-               Right res -> makeitwork res
+               Right res -> res
   putStrLn ""
   putStrLn "---------CODE---------"
   putStrLn code

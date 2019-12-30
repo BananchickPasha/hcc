@@ -12,7 +12,7 @@ import qualified Text.ParserCombinators.Parsec.Token
                                                as Token
 
 
-statements = choice $ map try [funcStm, returnStm, declStm, assignStm, ifStm, blockStm]
+statements = choice $ map try [funcStm, returnStm, declStm, assignStm, ifStm, blockStm, whileLoopStm]
 parseMany :: Parser [Statement]
 parseMany = many1 statements
 
@@ -49,11 +49,18 @@ assignStm = do
 blockStm :: Parser Statement
 blockStm = Block <$> inScope '{' parseMany
 
+whileLoopStm :: Parser Statement
+whileLoopStm = do
+  reserved "while"
+  expr  <- inScope '(' parseAnyExpr
+  stm   <- statements
+  return $ WhileLoop expr stm
+
 ifStm :: Parser Statement
 ifStm = do
   reserved "if"
   expr  <- inScope '(' parseAnyExpr
-  stms  <- inScope '{' parseMany <|> replicate 1 <$> statements
+  stms  <- statements
   elifs <- Just <$> (reserved "else" >> statements) <|> return Nothing
   return $ If expr stms elifs
 

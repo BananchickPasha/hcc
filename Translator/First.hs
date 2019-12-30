@@ -1,3 +1,4 @@
+{-# LANGUAGE QuasiQuotes #-}
 module Translator.First (trAST) where
 import AST
 import Control.Applicative
@@ -8,10 +9,12 @@ import qualified Data.Map as M
 import Distribution.Compat.Parsing (choice)
 import Translator.State
 
+import PyF
+
 
 
 trAST :: [Statement] -> String
-trAST stms = let initState = TranslatorST {variables = [M.empty], stackIndex = 0, errors = [], warnings = []} 
+trAST stms = let initState = TranslatorST {variables = [M.empty], stackIndex = 0, errors = [], warnings = [], labels = M.empty} 
                  func = runState (trStatements stms) initState
                  (state, code) = func
               in case errors state of
@@ -23,21 +26,22 @@ trStatements stms = concat <$> mapM trStatement stms
 trStatement :: Statement -> State TranslatorST String
 trStatement (Function name body) = do
   blocks <- mapM trStatement body
-  return $ unlines $ (".globl " ++ name) : (name++":") : "mov %rsp, %rbp" : blocks
+  return $ unlines $ [fmt|.globl {name}|] : [fmt|{name}:|] : "mov %rsp, %rbp" : blocks
 
 trStatement (Return mExpr) = case mExpr of
                                Just expr -> trExpr expr >>= \expr' -> return $ unlines [expr', preRetCode, "ret"]
                                Nothing -> return $ unlines ["mov $0, %rax", preRetCode ,"ret"]
                              where preRetCode = "mov %rbp, %rsp"
 trStatement (If expr stms els) = do
-  blocks <- mapM trStatement stms
+  blocks <- trStatement stms
   elseCode <- case els of 
                 Nothing -> return ""
-                Just e -> trStatement e
+                Just e -> trStatement $ Block [e]
   expr' <- trExpr expr
-  return . unlines $ [expr' , "cmp $0, %rax", "je _notThis"] ++ blocks ++ ["_notThis:", elseCode] 
+  notThis <- incLabel "_notThis"
+  return . unlines $ [expr' , "cmp $0, %rax", [fmt|je {notThis}|] , blocks, [fmt|{notThis}:|], elseCode] 
 trStatement (Decl varName mval) = do
-  val' <- getVar varName
+  val' <- getVarInFirst varName
   let val = fromMaybe (ConstExpr 0) mval
   case val' of 
     Just _ -> throwError "This var already exists" $> ""
@@ -51,27 +55,33 @@ trStatement (Assign varName val) = do
     Nothing -> throwError "This var does not exist" $> ""
     Just offset -> do 
       valCode <- trExpr val
-      return . unlines $ valCode : ["mov %rax, " ++ show offset ++ "(%rbp)"]
+      return . unlines $ valCode : [[fmt|mov %rax, {offset}(%rbp)|]]
 trStatement (Block stms) = do
   diveIn
   code <- trStatements stms
-  diveOut
-  return code
+  outCode <- diveOut
+  return $ code ++ outCode
+trStatement (WhileLoop expr stm) = do
+  expr <- trExpr expr
+  stms <- trStatement stm
+  loopBeg <- incLabel "_whileLoopBEGIN"
+  loopEnd <- incLabel "_whileLoopEND"
+  return $ unlines [loopBeg ++ ":", expr, "cmp $0, %rax", [fmt|je {loopEnd}|], stms, [fmt|jmp {loopBeg}|], loopEnd ++ ":"]
 
 trExpr :: Expr -> State TranslatorST String
-trExpr (ConstExpr x) = return $ "mov $" ++ show x ++ ", %rax"
+trExpr (ConstExpr x) = return [fmt|mov ${x}, %rax|]
 trExpr (VarExpr varName) = do
   mOffset <- getVar varName
   case mOffset of
     Nothing -> throwError "This var does not exist" $> ""
-    Just offset -> return $ "mov " ++ show offset ++ "(%rbp)" ++ ", %rax"
+    Just offset -> return [fmt|mov {offset}(%rbp), %rax|]
 
 trExpr (UnExpr expr x) = trExpr x >>= \x' -> return $ trExpr' expr x'
   where
   trExpr' NegExpr x = unlines [x, "neg %rax"]
   trExpr' BitWiseExpr x = unlines [x, "not %rax"]
   trExpr' NotExpr x = unlines [x, "cmp $0, %rax", "mov $0, %rax", "sete %al"]
-trExpr e@(BinExpr expr a b) = trExpr' expr
+trExpr (BinExpr expr a b) = trExpr' expr
   where 
     -- rbx is a 
     -- rax is b
@@ -95,15 +105,20 @@ trExpr e@(BinExpr expr a b) = trExpr' expr
   trExpr' BinLogLTExpr = trExpr $ UnExpr NotExpr (BinExpr BinLogGTEqExpr a b)
 
 
-  trExpr' BinLogOrExpr = parseTwo a b $ \a b -> return $ unlines [a, "cmp $1, %rax", "je _lazyOR", b, "_lazyOR:"]
-  trExpr' BinLogAndExpr = parseTwo a b $ \a b -> return $ unlines [a, "cmp $0, %rax", "je _lazyAND", b, "_lazyAND:"]
-  trStack instructions = trStack' instructions a b
-  trStack' :: [String] -> Expr -> Expr -> State TranslatorST String
-  trStack' instructions a' b' = parseTwo a' b' $ \parsedA parsedB -> return . unlines $ [parsedA, "push %rax", parsedB, "pop %rbx"] ++ instructions
-  parseTwo :: Expr -> Expr -> (String -> String -> State TranslatorST String) -> State TranslatorST String
-  parseTwo a b f = do
+  trExpr' BinLogOrExpr = do
     parsedA <- trExpr a
     parsedB <- trExpr b
-    f parsedA parsedB
-
+    label <- incLabel "_lazyOR"
+    return $ unlines [parsedA, "cmp $1, %rax", [fmt|je {label}|], parsedB, label ++ ":"]
+  trExpr' BinLogAndExpr = do
+    parsedA <- trExpr a
+    parsedB <- trExpr b
+    label <- incLabel "_lazyAND"
+    return $ unlines [parsedA, "cmp $0, %rax", [fmt|je {label}|], parsedB, label ++ ":"]
+  trStack instructions = trStack' instructions a b
+  trStack' :: [String] -> Expr -> Expr -> State TranslatorST String
+  trStack' instructions a' b' = do
+    parsedA <- trExpr a'
+    parsedB <- trExpr b'
+    return . unlines $ [parsedA, "push %rax", parsedB, "pop %rbx"] ++ instructions
 

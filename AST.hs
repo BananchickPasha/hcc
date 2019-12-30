@@ -7,11 +7,13 @@ module AST
 where
 
 data Statement = Return (Maybe Expr)
+               | Expr Expr
                | Assign String Expr
                | Block [Statement]
                | Decl   String (Maybe Expr)
                | Function String [Statement] --right now only () functiosn
-               | If Expr [Statement] (Maybe Statement)
+               | If Expr Statement (Maybe Statement)
+               | WhileLoop Expr Statement
                deriving (Show)
 
 data Expr = ConstExpr Int
@@ -23,6 +25,10 @@ data Expr = ConstExpr Int
 data UnExpr = NegExpr
             | BitWiseExpr
             | NotExpr
+            | IncPostfix
+            | IncPrefix
+            | DecPrefix
+            | DecPostfix
             deriving (Show)
 
 data BinExpr = BinAddExpr
