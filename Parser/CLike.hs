@@ -8,21 +8,21 @@ import           Text.ParserCombinators.Parsec
 import           Text.ParserCombinators.Parsec.Language
 import           Text.ParserCombinators.Parsec.Expr
 import           Control.Monad
+import           Data.Functor
 import qualified Text.ParserCombinators.Parsec.Token
                                                as Token
 
 
-statements = choice $ map try [funcStm, returnStm, declStm, assignStm, ifStm, blockStm, whileLoopStm]
+statements = choice $ map try $ [brContStms, funcStm, returnStm, declStm, ifStm, blockStm, whileLoopStm, exprStm]
 parseMany :: Parser [Statement]
-parseMany = many1 statements
+parseMany = many statements
 
 funcStm :: Parser Statement
 funcStm = do
   reserved "int"
   fname <- var
-  inScope '(' whitespace
-  blocks <- inScope '{' parseMany
-  return $ Function fname blocks
+  params <- inScope '(' $ (reserved "int" >> var) `sepBy` char ','
+  Function fname params <$> statements
 
 returnStm :: Parser Statement
 returnStm = do
@@ -39,16 +39,16 @@ declStm = do
   reservedChar ';'
   return $ Decl varName expr
 
-assignStm :: Parser Statement
-assignStm = do
-  varName <- var
-  expr <- reservedChar '=' >> parseAnyExpr
+exprStm :: Parser Statement
+exprStm = do
+  expr <- parseAnyExpr
   reservedChar ';'
-  return $ Assign varName expr
-
+  return $ Expr expr
 blockStm :: Parser Statement
 blockStm = Block <$> inScope '{' parseMany
 
+brContStms :: Parser Statement
+brContStms = (Break <$ reserved "break" <|> Continue <$ reserved "continue") <* reservedChar ';'
 whileLoopStm :: Parser Statement
 whileLoopStm = do
   reserved "while"

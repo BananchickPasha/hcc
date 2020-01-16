@@ -5,8 +5,10 @@ HIES= $(FILES:.hs=.hi)
 SHIT= $(FILES:.hs=.dyn*)
 FLAGS= -Wall\
 			 -threaded\
-			 -ddump-splices\
-			 -dynamic
+			 -dynamic\
+			 -g\
+			 -rtsopts\
+			 -ddump-splices
 build: $(FILES)
 	$(CC) Main.hs $(FLAGS) -outputdir bin -o "bin/$(TARG)"
 
