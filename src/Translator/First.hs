@@ -4,12 +4,9 @@ module Translator.First
   )
 where
 import           AST
-import           Control.Applicative
 import           Data.Maybe                     ( fromMaybe )
 import           Data.Sequence.Internal         ( State(..) )
 import           Data.Functor
-import qualified Data.Map                      as M
-import           Distribution.Compat.Parsing    ( choice )
 import           Translator.State
 
 import           PyF
@@ -17,17 +14,10 @@ import           PyF
 
 
 trAST :: [Statement] -> String
-trAST stms =
-  let initState = TranslatorST { variables  = [[M.empty]]
-                               , stackIndex = [0]
-                               , errors     = []
-                               , warnings   = []
-                               , labels     = M.empty
-                               , funcs      = M.empty
-                               }
+trAST stms = let
       func          = runState (trStatements stms) initState
       (state, code) = func
-  in  case errors state of
+  in  case _errors state of
         [] -> code
         xs -> concat $ Prelude.reverse xs
 
