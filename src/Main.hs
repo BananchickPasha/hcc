@@ -11,7 +11,7 @@ import Parser.CLike
 import Translator.First
 
 main = do
-  str <- readFile "test/test.c"
+  str <- readFile "test/test1.c"
   let ast = parse parseMany "" str
   print ast
   let code = case generateCode str of
