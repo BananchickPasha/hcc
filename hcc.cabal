@@ -14,14 +14,14 @@ maintainer:          smidy999green@gmail.com
 -- category:
 build-type:          Simple
 
-executable hide
+executable hcc
   hs-source-dirs:      src
   main-is:             Main.hs
   ghc-options:         -Wall
                        -threaded
                        -fwrite-ide-info
                        -hiedir=.hie
-  --exposed-modules:     Buffer, Editor, UI, Modes, Zipper
+  exposed-modules:     State, CExpr, CLike, Lexemes, Ast, First
   -- other-extensions:
   build-depends:       base
                        , polysemy
